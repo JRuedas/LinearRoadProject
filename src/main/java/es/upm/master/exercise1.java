@@ -22,7 +22,7 @@ import java.util.Iterator;
 
 public class exercise1 {
     public static void main(String[] args) throws Exception{
-
+        
         final ParameterTool params = ParameterTool.fromArgs(args);
 
         // set up the execution environment
@@ -33,8 +33,6 @@ public class exercise1 {
 
         // read the text file from given input path
         text = env.readTextFile(params.get("input"));
-        System.out.println();
-
 
         // make parameters available in the web interface
         env.getConfig().setGlobalJobParameters(params);
@@ -43,6 +41,8 @@ public class exercise1 {
         SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Integer>> mapStream = text.
                 map(new MapFunction<String, Tuple4<Long, Integer, Integer, Integer>>() {
                     public Tuple4<Long, Integer, Integer, Integer> map(String in) throws Exception{
+
+                        System.out.println("Hola");
                         String[] fieldArray = in.split(",");
                         Tuple4<Long, Integer, Integer, Integer> out
                                 = new Tuple4(Long.parseLong(fieldArray[0]), // Time
@@ -69,12 +69,12 @@ public class exercise1 {
                 ).keyBy(1);
 
         SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Integer>> sumTumblingEventTimeWindows =
-                keyedStream.window(TumblingEventTimeWindows.of(Time.seconds(5))).apply(new CountVehicles());
+                keyedStream.window(TumblingEventTimeWindows.of(Time.hours(1))).apply(new CountVehicles());
 
         // emit result
         if (params.has("output")) {
             String file=params.get("output");
-            sumTumblingEventTimeWindows.writeAsText(file);
+            sumTumblingEventTimeWindows.writeAsCsv(file);
         }
 
         // execute program
@@ -99,7 +99,6 @@ public class exercise1 {
                 Tuple4<Long, Integer, Integer, Integer> next = iterator.next();
                 count += next.f3;
             }
-            System.out.println("Hola");
             out.collect(new Tuple4<Long, Integer, Integer, Integer>(time, xway, lane, count));
         }
     }
