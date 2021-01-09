@@ -2,7 +2,9 @@ package es.upm.master;
 
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.java.tuple.*;
+import org.apache.flink.api.java.tuple.Tuple;
+import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.tuple.Tuple8;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -11,8 +13,6 @@ import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.AscendingTimestampExtractor;
 import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
-import org.apache.flink.streaming.api.windowing.assigners.EventTimeSessionWindows;
-import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
@@ -21,6 +21,7 @@ import org.apache.flink.util.Collector;
 import java.util.Iterator;
 
 public class exercise1 {
+
     public static void main(String[] args) throws Exception{
 
         final ParameterTool params = ParameterTool.fromArgs(args);
@@ -33,40 +34,46 @@ public class exercise1 {
 
         // read the text file from given input path
         text = env.readTextFile(params.get("input"));
-        System.out.println();
-
 
         // make parameters available in the web interface
         env.getConfig().setGlobalJobParameters(params);
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
-        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Integer>> mapStream = text.
-                map(new MapFunction<String, Tuple4<Long, Integer, Integer, Integer>>() {
-                    public Tuple4<Long, Integer, Integer, Integer> map(String in) throws Exception{
+        SingleOutputStreamOperator<Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> mapStream = text.
+                map(new MapFunction<String, Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer>>() {
+                    public Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer> map(String in) throws Exception {
                         String[] fieldArray = in.split(",");
-                        Tuple4<Long, Integer, Integer, Integer> out
-                                = new Tuple4(Long.parseLong(fieldArray[0]), // Time
+                        Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer> out
+                                = new Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer> (
+                                Long.parseLong(fieldArray[0]), // Time
+                                Integer.parseInt(fieldArray[1]), // VID
+                                Integer.parseInt(fieldArray[2]), // Spd
                                 Integer.parseInt(fieldArray[3]), // Xway
                                 Integer.parseInt(fieldArray[4]), // Lane
-                                1); // Count
+                                Integer.parseInt(fieldArray[5]), // Dig
+                                Integer.parseInt(fieldArray[6]), // Seg
+                                Integer.parseInt(fieldArray[7]) // Pos
+                        );
                         return out;
                     }
-                })
-                .filter(new FilterFunction<Tuple4<Long, Integer, Integer, Integer>>() {
-            public boolean filter(Tuple4<Long, Integer, Integer, Integer> tuple) throws Exception {
-                return tuple.f2 == 4;
-            }
-        });
+                });
 
-        KeyedStream<Tuple4<Long, Integer, Integer, Integer>, Tuple> keyedStream = mapStream.
+        SingleOutputStreamOperator<Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> filterStream = mapStream
+                .filter(new FilterFunction<Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer>>() {
+                    public boolean filter(Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer> tuple) throws Exception {
+                        return tuple.f4 == 4;
+                    }
+                });
+
+        KeyedStream<Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer>, Tuple> keyedStream = mapStream.
                 assignTimestampsAndWatermarks(
-                        new AscendingTimestampExtractor<Tuple4<Long, Integer, Integer, Integer>>() {
+                        new AscendingTimestampExtractor<Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer>>() {
                             @Override
-                            public long extractAscendingTimestamp(Tuple4<Long, Integer, Integer, Integer> element) {
+                            public long extractAscendingTimestamp(Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer> element) {
                                 return element.f0*30*1000;
                             }
                         }
-                ).keyBy(1);
+                ).keyBy(3);
 
         SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Integer>> sumTumblingEventTimeWindows =
                 keyedStream.window(TumblingEventTimeWindows.of(Time.seconds(5))).apply(new CountVehicles());
@@ -81,26 +88,37 @@ public class exercise1 {
         env.execute("exercise1");
     }
 
-    public static class CountVehicles implements WindowFunction<Tuple4<Long, Integer, Integer, Integer>, Tuple4<Long, Integer, Integer, Integer>, Tuple, TimeWindow> {
-        public void apply(Tuple tuple, TimeWindow timeWindow, Iterable<Tuple4<Long, Integer, Integer, Integer>> input, Collector<Tuple4<Long, Integer, Integer, Integer>> out) throws Exception {
-            Iterator<Tuple4<Long, Integer, Integer, Integer>> iterator = input.iterator();
-            Tuple4<Long, Integer, Integer, Integer> first = iterator.next();
+    public static class CountVehicles implements WindowFunction<Tuple8<Long, Integer, Integer, Integer, Integer, Integer,
+            Integer, Integer>, Tuple4<Long, Integer, Integer, Integer>, Tuple, TimeWindow> {
+
+        public void apply(Tuple tuple, TimeWindow timeWindow, Iterable<Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> input,
+                          Collector<Tuple4<Long, Integer, Integer, Integer>> out) throws Exception {
+
+            Iterator<Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> iterator = input.iterator();
+
+            Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer> first = iterator.next();
+
             Long time = 0L;
             Integer xway = 0;
             Integer lane = 0;
-            Integer count = 0;
+            int count = 0;
+
             if(first!=null){
+
                 time = first.f0;
                 xway = first.f1;
                 lane = first.f2;
-                count = first.f3;
+                count++;
             }
+
             while(iterator.hasNext()){
-                Tuple4<Long, Integer, Integer, Integer> next = iterator.next();
-                count += next.f3;
+                Tuple8<Long, Integer, Integer, Integer, Integer, Integer, Integer, Integer> next = iterator.next();
+                count++;
+
             }
-            System.out.println("Hola");
-            out.collect(new Tuple4<Long, Integer, Integer, Integer>(time, xway, lane, count));
+
+            Tuple4<Long, Integer, Integer, Integer> outputTuple = new Tuple4<Long, Integer, Integer, Integer>(time, xway, lane, count);
+            out.collect(outputTuple);
         }
     }
 }
