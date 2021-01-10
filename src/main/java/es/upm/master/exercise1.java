@@ -4,6 +4,7 @@ import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.*;
 import org.apache.flink.api.java.utils.ParameterTool;
+import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
@@ -11,16 +12,21 @@ import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.AscendingTimestampExtractor;
 import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
-import org.apache.flink.streaming.api.windowing.assigners.EventTimeSessionWindows;
-import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
 import java.util.Iterator;
 
 public class exercise1 {
+
+    private static final Logger LOG = LoggerFactory.getLogger(exercise1.class);
+
     public static void main(String[] args) throws Exception{
         
         final ParameterTool params = ParameterTool.fromArgs(args);
@@ -42,7 +48,6 @@ public class exercise1 {
                 map(new MapFunction<String, Tuple4<Long, Integer, Integer, Integer>>() {
                     public Tuple4<Long, Integer, Integer, Integer> map(String in) throws Exception{
 
-                        System.out.println("Hola");
                         String[] fieldArray = in.split(",");
                         Tuple4<Long, Integer, Integer, Integer> out
                                 = new Tuple4(Long.parseLong(fieldArray[0]), // Time
@@ -54,6 +59,8 @@ public class exercise1 {
                 })
                 .filter(new FilterFunction<Tuple4<Long, Integer, Integer, Integer>>() {
             public boolean filter(Tuple4<Long, Integer, Integer, Integer> tuple) throws Exception {
+                if (tuple.f2 == 4)
+                    LOG.info(tuple.f0 + " " + tuple.f1 + " " +  tuple.f2 + " " + tuple.f3);
                 return tuple.f2 == 4;
             }
         });
@@ -63,7 +70,7 @@ public class exercise1 {
                         new AscendingTimestampExtractor<Tuple4<Long, Integer, Integer, Integer>>() {
                             @Override
                             public long extractAscendingTimestamp(Tuple4<Long, Integer, Integer, Integer> element) {
-                                return element.f0*30*1000;
+                                return element.f0*1000;
                             }
                         }
                 ).keyBy(1);
@@ -74,7 +81,7 @@ public class exercise1 {
         // emit result
         if (params.has("output")) {
             String file=params.get("output");
-            sumTumblingEventTimeWindows.writeAsCsv(file);
+            sumTumblingEventTimeWindows.writeAsCsv(file, FileSystem.WriteMode.OVERWRITE);
         }
 
         // execute program
