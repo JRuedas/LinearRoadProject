@@ -1,3 +1,6 @@
+# Output of exercises
+out_*.csv
+
 # IntelliJ
 .idea/*
 
