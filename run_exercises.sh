@@ -1,5 +1,6 @@
 #!/bin/bash
 
+mvn package
 case "$1" in
   "1") $FLINK_HOME/flink run -c es.upm.master.exercise1 target/LinearRoadProject-1.0-SNAPSHOT.jar -input vehiclesData.csv -output out_exercise1.csv
   ;;
