@@ -64,7 +64,7 @@ public class exercise1 {
 
                     @Override
                     public long extractAscendingTimestamp(Tuple3<Long, Integer, Integer> element) {
-                        return element.f0*30*1000;
+                        return element.f0*1000;
                     }
                 })
                 .keyBy(1); // Key by Xway
