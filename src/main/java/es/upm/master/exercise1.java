@@ -76,7 +76,7 @@ public class exercise1 {
         // emit result
         if (params.has("output")) {
             String file = params.get("output");
-            sumTumblingEventTimeWindow.writeAsText(file, FileSystem.WriteMode.OVERWRITE);
+            sumTumblingEventTimeWindow.writeAsCsv(file, FileSystem.WriteMode.OVERWRITE);
         }
 
         // execute program
