@@ -1,6 +1,5 @@
 package es.upm.master;
 
-import org.apache.commons.collections.map.HashedMap;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple;
@@ -20,7 +19,7 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 
-import java.util.*;
+import java.util.Iterator;
 
 public class exercise2 {
 
@@ -35,7 +34,7 @@ public class exercise2 {
         DataStream<String> text = env.readTextFile(params.get("input"));
 
         int time = Integer.parseInt(params.get("time"));
-        final int speed = Integer.parseInt(params.get("time"));
+        final int speed = Integer.parseInt(params.get("speed"));
         final int startSegment = Integer.parseInt(params.get("startSegment"));
         final int endSegment = Integer.parseInt(params.get("endSegment"));
 
@@ -76,11 +75,48 @@ public class exercise2 {
                         return element.f0*1000;
                     }
                 })
-                .keyBy(2); // Key by VID
+                .keyBy(1,3); // Key by VID and Xway
 
+        // Compute Avg speed
         SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Float>> avgSpeedTumblingEventTimeWindow = keyedStream
                 .window(TumblingEventTimeWindows.of(Time.seconds(time)))
-                .apply(new ComputeAverageSpeed())
+                .apply(new ComputeAverageSpeed());
+//        SingleOutputStreamOperator<Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer>> reduce = keyedStream
+//                .reduce(new ReduceFunction<Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer>>() {
+//
+//                            public Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer> reduce(Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer> previous,
+//                                                                                                             Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer> current) {
+//
+//                                return new Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer>(
+//                                        current.f0,              //Time
+//                                        current.f1,              //VID
+//                                        previous.f2+current.f2,    //Speed Acc + Speed
+//                                        current.f3,              //Xway
+//                                        current.f4,              //Dir
+//                                        current.f5,              //Seg
+//                                        previous.f6+current.f6);   //Counter
+//                            }
+//                        }
+//                );
+//
+//        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Float>> avg = reduce
+//                .map(new MapFunction<Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer>,
+//                        Tuple4<Long, Integer, Integer, Float>>() {
+//
+//                    public Tuple4<Long, Integer, Integer, Float> map(Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer> in) {
+//
+//                        float avgSpeed = (float) in.f2/in.f6;
+//                        return new Tuple4<Long, Integer, Integer, Float>(
+//                                in.f0, // Time
+//                                in.f1, // VID
+//                                in.f3, // Xway
+//                                avgSpeed // AvgSpeed
+//                        );
+//                    }
+//                });
+
+        // Filter by Avg speed
+        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Float>> filterBySpeedStream = avgSpeedTumblingEventTimeWindow
                 .filter(new FilterFunction<Tuple4<Long, Integer, Integer, Float>>() {
 
                     public boolean filter(Tuple4<Long, Integer, Integer, Float> tuple) {
@@ -88,8 +124,8 @@ public class exercise2 {
                     }
                 });
 
-        // TODO: Union streams to execute ComputeOutput function
-        KeyedStream<Tuple4<Long, Integer, Integer, Float>, Tuple> keyedStream2 = avgSpeedTumblingEventTimeWindow.keyBy(1);
+        KeyedStream<Tuple4<Long, Integer, Integer, Float>, Tuple> keyedStream2 = filterBySpeedStream
+                .keyBy(2);  // Key by Xway
 
         SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, String>> sumTumblingEventTimeWindow = keyedStream2
                 .window(TumblingEventTimeWindows.of(Time.seconds(time)))
@@ -98,7 +134,7 @@ public class exercise2 {
         // emit result
         if (params.has("output")) {
             String file = params.get("output");
-            sumTumblingEventTimeWindow.writeAsText(file, FileSystem.WriteMode.OVERWRITE);
+            sumTumblingEventTimeWindow.writeAsCsv(file, FileSystem.WriteMode.OVERWRITE);
         }
 
         // execute program
@@ -115,31 +151,30 @@ public class exercise2 {
             Tuple6<Long, Integer, Integer, Integer, Integer, Integer> first = iterator.next();
 
             long time = 0L;
-            int xway = 0;
             int vid = 0;
+            int xway = 0;
 
             int sumSpeed = 0;
-            int numberOfReports = 0;
+            int numberOfReports = 1;
 
             if(first != null) {
 
                 time = first.f0;
-                xway = first.f3;
                 vid = first.f1;
-                sumSpeed =+ first.f2;
-                numberOfReports++;
+                sumSpeed = first.f2;
+                xway = first.f3;
             }
 
             while(iterator.hasNext()){
 
                 Tuple6<Long, Integer, Integer, Integer, Integer, Integer> next = iterator.next();
-                sumSpeed =+ next.f2;
+                sumSpeed += next.f2;
                 numberOfReports++;
             }
 
-            float avgSpeed = sumSpeed/numberOfReports;
+            float avgSpeed = (float) sumSpeed/numberOfReports;
 
-            out.collect(new Tuple4<Long, Integer, Integer, Float>(time, xway, vid, avgSpeed));
+            out.collect(new Tuple4<Long, Integer, Integer, Float>(time, vid, xway, avgSpeed));
         }
     }
 
@@ -160,15 +195,18 @@ public class exercise2 {
 
             if(first != null) {
                 time = first.f0;
-                xway = first.f1;
-                sb.append(first.f2);
+                sb.append(first.f1);
+                xway = first.f2;
+                numberOfVehicles++;
             }
 
             while(iterator.hasNext()){
 
                 Tuple4<Long, Integer, Integer, Float> next = iterator.next();
+                time = Math.min(time, next.f0);
                 sb.append("-");
                 sb.append(next.f1);
+                numberOfVehicles++;
             }
 
             sb.append("]");
