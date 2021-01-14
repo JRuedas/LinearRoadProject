@@ -42,24 +42,24 @@ public class exercise2 {
         env.getConfig().setGlobalJobParameters(params);
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
-        SingleOutputStreamOperator<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>> mapStream = text
+        SingleOutputStreamOperator<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>> mappedStream = text
                 .map(new MapFunction<String, Tuple6<Long, Integer, Integer, Integer, Integer, Integer>>() {
 
                     public Tuple6<Long, Integer, Integer, Integer, Integer, Integer> map(String in) {
 
                         String[] fieldArray = in.split(",");
                         return new Tuple6<Long, Integer, Integer, Integer, Integer, Integer>(
-                                Long.parseLong(fieldArray[0]), // Time
+                                Long.parseLong(fieldArray[0]),   // Time
                                 Integer.parseInt(fieldArray[1]), // VID
                                 Integer.parseInt(fieldArray[2]), // Speed
                                 Integer.parseInt(fieldArray[3]), // Xway
                                 Integer.parseInt(fieldArray[5]), // Dir
-                                Integer.parseInt(fieldArray[6]) // Seg
+                                Integer.parseInt(fieldArray[6])  // Seg
                         );
                     }
                 });
 
-        SingleOutputStreamOperator<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>> filterStream = mapStream
+        SingleOutputStreamOperator<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>> filteredStream = mappedStream
                 .filter(new FilterFunction<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>>() {
 
                     public boolean filter(Tuple6<Long, Integer, Integer, Integer, Integer, Integer> tuple) {
@@ -67,7 +67,7 @@ public class exercise2 {
                     }
                 });
 
-        KeyedStream<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>, Tuple> keyedStream = filterStream
+        KeyedStream<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>, Tuple> keyedByVIDStream = filteredStream
                 .assignTimestampsAndWatermarks(new AscendingTimestampExtractor<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>>() {
 
                     @Override
@@ -75,48 +75,15 @@ public class exercise2 {
                         return element.f0*1000;
                     }
                 })
-                .keyBy(1,3); // Key by VID and Xway
+                .keyBy(1); // Key by VID
 
-        // Compute Avg speed
-        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Float>> avgSpeedTumblingEventTimeWindow = keyedStream
+        // Compute Avg speed per car
+        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Float>> carAvgSpeedTumblingEventTimeWindow = keyedByVIDStream
                 .window(TumblingEventTimeWindows.of(Time.seconds(time)))
                 .apply(new ComputeAverageSpeed());
-//        SingleOutputStreamOperator<Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer>> reduce = keyedStream
-//                .reduce(new ReduceFunction<Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer>>() {
-//
-//                            public Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer> reduce(Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer> previous,
-//                                                                                                             Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer> current) {
-//
-//                                return new Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer>(
-//                                        current.f0,              //Time
-//                                        current.f1,              //VID
-//                                        previous.f2+current.f2,    //Speed Acc + Speed
-//                                        current.f3,              //Xway
-//                                        current.f4,              //Dir
-//                                        current.f5,              //Seg
-//                                        previous.f6+current.f6);   //Counter
-//                            }
-//                        }
-//                );
-//
-//        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Float>> avg = reduce
-//                .map(new MapFunction<Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer>,
-//                        Tuple4<Long, Integer, Integer, Float>>() {
-//
-//                    public Tuple4<Long, Integer, Integer, Float> map(Tuple7<Long, Integer, Integer, Integer, Integer, Integer, Integer> in) {
-//
-//                        float avgSpeed = (float) in.f2/in.f6;
-//                        return new Tuple4<Long, Integer, Integer, Float>(
-//                                in.f0, // Time
-//                                in.f1, // VID
-//                                in.f3, // Xway
-//                                avgSpeed // AvgSpeed
-//                        );
-//                    }
-//                });
 
-        // Filter by Avg speed
-        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Float>> filterBySpeedStream = avgSpeedTumblingEventTimeWindow
+        // Filter cars by Avg speed
+        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Float>> filteredSpeedStream = carAvgSpeedTumblingEventTimeWindow
                 .filter(new FilterFunction<Tuple4<Long, Integer, Integer, Float>>() {
 
                     public boolean filter(Tuple4<Long, Integer, Integer, Float> tuple) {
@@ -124,17 +91,18 @@ public class exercise2 {
                     }
                 });
 
-        KeyedStream<Tuple4<Long, Integer, Integer, Float>, Tuple> keyedStream2 = filterBySpeedStream
+        KeyedStream<Tuple4<Long, Integer, Integer, Float>, Tuple> keyedByXwayStream = filteredSpeedStream
                 .keyBy(2);  // Key by Xway
 
-        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, String>> sumTumblingEventTimeWindow = keyedStream2
+        // Compute output
+        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, String>> outputTumblingEventTimeWindow = keyedByXwayStream
                 .window(TumblingEventTimeWindows.of(Time.seconds(time)))
                 .apply(new ComputeOutput());
 
         // emit result
         if (params.has("output")) {
             String file = params.get("output");
-            sumTumblingEventTimeWindow.writeAsCsv(file, FileSystem.WriteMode.OVERWRITE);
+            outputTumblingEventTimeWindow.writeAsCsv(file, FileSystem.WriteMode.OVERWRITE);
         }
 
         // execute program
