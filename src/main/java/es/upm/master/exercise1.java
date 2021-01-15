@@ -107,7 +107,7 @@ public class exercise1 {
             }
 
             while(iterator.hasNext()){
-                Tuple3<Long, Integer, Integer> next = iterator.next();
+                iterator.next();
                 numberOfVehicles++;
             }
 
