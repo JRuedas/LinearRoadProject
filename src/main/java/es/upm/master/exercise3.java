@@ -77,30 +77,6 @@ public class exercise3 {
         SingleOutputStreamOperator<Tuple3<Integer, Integer, Integer>> carAvgSpeedTumblingEventTimeWindow = keyedByVIDStream
                 .window(TumblingEventTimeWindows.of(Time.hours(1)))
                 .apply(new ComputeAverageSpeed());
-//                .apply(new AggregateFunction<Tuple4<Integer, Integer, Integer, Integer>, Tuple3<Integer, Integer, Integer>, Double>() {
-//
-//                           public Tuple3<Integer, Integer, Integer> createAccumulator() {
-//                               return null;
-//                           }
-//
-//                           public Tuple3<Integer, Integer, Integer> add(Tuple4<Integer, Integer, Integer, Integer> integerIntegerIntegerIntegerTuple4, Tuple3<Integer, Integer, Integer> integerIntegerIntegerTuple3) {
-//                               return null;
-//                           }
-//
-//                           public Double getResult(Tuple3<Integer, Integer, Integer> integerIntegerIntegerTuple3) {
-//                               return null;
-//                           }
-//
-//                           public Tuple3<Integer, Integer, Integer> merge(Tuple3<Integer, Integer, Integer> integerIntegerIntegerTuple3, Tuple3<Integer, Integer, Integer> acc1) {
-//                               return null;
-//                           }
-//                       },
-//                        new ProcessWindowFunction<Double, Tuple3<Integer, Integer, Integer>, TimeWindow>() {
-//
-//                            public void process(Object o, Context context, Iterable iterable, Collector collector) throws Exception {
-//
-//                            }
-//                        });
 
         // emit result
         if (params.has("output1")) {
@@ -174,25 +150,24 @@ public class exercise3 {
             int vid = 0;
             int xway = 0;
 
-            int sumSpeed = 0;
-            int numberOfReports = 0;
+            int avgSpeed = 0;
 
             if(first != null) {
 
                 vid = first.f0;
-                sumSpeed = first.f1;
-                xway = first.f2;
-                numberOfReports++;
+                xway = first.f1;
+                avgSpeed = first.f2;
             }
 
             while(iterator.hasNext()){
 
                 Tuple3<Integer, Integer, Integer> next = iterator.next();
-                sumSpeed += next.f1;
-                numberOfReports++;
-            }
 
-            int avgSpeed = sumSpeed/numberOfReports;
+                if (next.f2 > avgSpeed) {
+                    vid = next.f0;
+                    avgSpeed = next.f2;
+                }
+            }
 
             out.collect(new Tuple3<Integer, Integer, Integer>(vid, xway, avgSpeed));
         }
