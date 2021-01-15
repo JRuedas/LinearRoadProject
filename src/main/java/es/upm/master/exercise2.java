@@ -78,20 +78,20 @@ public class exercise2 {
                 .keyBy(1); // Key by VID
 
         // Compute Avg speed per car
-        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Float>> carAvgSpeedTumblingEventTimeWindow = keyedByVIDStream
+        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Integer>> carAvgSpeedTumblingEventTimeWindow = keyedByVIDStream
                 .window(TumblingEventTimeWindows.of(Time.seconds(time)))
                 .apply(new ComputeAverageSpeed());
 
         // Filter cars by Avg speed
-        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Float>> filteredSpeedStream = carAvgSpeedTumblingEventTimeWindow
-                .filter(new FilterFunction<Tuple4<Long, Integer, Integer, Float>>() {
+        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Integer>> filteredSpeedStream = carAvgSpeedTumblingEventTimeWindow
+                .filter(new FilterFunction<Tuple4<Long, Integer, Integer, Integer>>() {
 
-                    public boolean filter(Tuple4<Long, Integer, Integer, Float> tuple) {
+                    public boolean filter(Tuple4<Long, Integer, Integer, Integer> tuple) {
                         return tuple.f3 > speed;
                     }
                 });
 
-        KeyedStream<Tuple4<Long, Integer, Integer, Float>, Tuple> keyedByXwayStream = filteredSpeedStream
+        KeyedStream<Tuple4<Long, Integer, Integer, Integer>, Tuple> keyedByXwayStream = filteredSpeedStream
                 .keyBy(2);  // Key by Xway
 
         // Compute output
@@ -110,10 +110,10 @@ public class exercise2 {
     }
 
     public static class ComputeAverageSpeed implements WindowFunction<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>,
-            Tuple4<Long, Integer, Integer, Float>, Tuple, TimeWindow> {
+            Tuple4<Long, Integer, Integer, Integer>, Tuple, TimeWindow> {
 
         public void apply(Tuple tuple, TimeWindow timeWindow, Iterable<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>> input,
-                          Collector<Tuple4<Long, Integer, Integer, Float>> out) {
+                          Collector<Tuple4<Long, Integer, Integer, Integer>> out) {
 
             Iterator<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>> iterator = input.iterator();
             Tuple6<Long, Integer, Integer, Integer, Integer, Integer> first = iterator.next();
@@ -123,7 +123,7 @@ public class exercise2 {
             int xway = 0;
 
             int sumSpeed = 0;
-            int numberOfReports = 1;
+            int numberOfReports = 0;
 
             if(first != null) {
 
@@ -131,6 +131,7 @@ public class exercise2 {
                 vid = first.f1;
                 sumSpeed = first.f2;
                 xway = first.f3;
+                numberOfReports++;
             }
 
             while(iterator.hasNext()){
@@ -140,20 +141,20 @@ public class exercise2 {
                 numberOfReports++;
             }
 
-            float avgSpeed = (float) sumSpeed/numberOfReports;
+            int avgSpeed = sumSpeed/numberOfReports;
 
-            out.collect(new Tuple4<Long, Integer, Integer, Float>(time, vid, xway, avgSpeed));
+            out.collect(new Tuple4<Long, Integer, Integer, Integer>(time, vid, xway, avgSpeed));
         }
     }
 
-    public static class ComputeOutput implements WindowFunction<Tuple4<Long, Integer, Integer, Float>,
+    public static class ComputeOutput implements WindowFunction<Tuple4<Long, Integer, Integer, Integer>,
             Tuple4<Long, Integer, Integer, String>, Tuple, TimeWindow> {
 
-        public void apply(Tuple tuple, TimeWindow timeWindow, Iterable<Tuple4<Long, Integer, Integer, Float>> input,
+        public void apply(Tuple tuple, TimeWindow timeWindow, Iterable<Tuple4<Long, Integer, Integer, Integer>> input,
                           Collector<Tuple4<Long, Integer, Integer, String>> out) {
 
-            Iterator<Tuple4<Long, Integer, Integer, Float>> iterator = input.iterator();
-            Tuple4<Long, Integer, Integer, Float> first = iterator.next();
+            Iterator<Tuple4<Long, Integer, Integer, Integer>> iterator = input.iterator();
+            Tuple4<Long, Integer, Integer, Integer> first = iterator.next();
 
             long time = 0L;
             int xway = 0;
@@ -170,7 +171,7 @@ public class exercise2 {
 
             while(iterator.hasNext()){
 
-                Tuple4<Long, Integer, Integer, Float> next = iterator.next();
+                Tuple4<Long, Integer, Integer, Integer> next = iterator.next();
                 time = Math.min(time, next.f0);
                 sb.append("-");
                 sb.append(next.f1);
