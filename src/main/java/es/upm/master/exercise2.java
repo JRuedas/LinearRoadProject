@@ -161,7 +161,7 @@ public class exercise2 {
             int xway = 0;
 
             int numberOfVehicles = 0;
-            StringBuilder sb = new StringBuilder("[");
+            StringBuilder sb = new StringBuilder("[ ");
 
             if(first != null) {
                 time = first.f0;
@@ -174,12 +174,12 @@ public class exercise2 {
 
                 Tuple4<Long, Integer, Integer, Integer> next = iterator.next();
                 time = Math.min(time, next.f0);
-                sb.append("-");
+                sb.append(" - ");
                 sb.append(next.f1);
                 numberOfVehicles++;
             }
 
-            sb.append("]");
+            sb.append(" ]");
 
             out.collect(new Tuple4<Long, Integer, Integer, String>(time, xway, numberOfVehicles, sb.toString()));
         }
