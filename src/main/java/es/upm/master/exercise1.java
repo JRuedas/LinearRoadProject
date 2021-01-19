@@ -37,7 +37,7 @@ public class exercise1 {
         env.getConfig().setGlobalJobParameters(params);
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
-        SingleOutputStreamOperator<Tuple3<Long, Integer, Integer>> mapStream = text
+        SingleOutputStreamOperator<Tuple3<Long, Integer, Integer>> mappedStream = text
                 .map(new MapFunction<String, Tuple3<Long, Integer, Integer>>() {
 
                     public Tuple3<Long, Integer, Integer> map(String in) {
@@ -51,7 +51,8 @@ public class exercise1 {
                     }
                 });
 
-        SingleOutputStreamOperator<Tuple3<Long, Integer, Integer>> filterStream = mapStream
+        // Filter by Lane 4 = exit lane
+        SingleOutputStreamOperator<Tuple3<Long, Integer, Integer>> filteredStream = mappedStream
                 .filter(new FilterFunction<Tuple3<Long, Integer, Integer>>() {
 
                     public boolean filter(Tuple3<Long, Integer, Integer> tuple) {
@@ -59,7 +60,7 @@ public class exercise1 {
                     }
                 });
 
-        KeyedStream<Tuple3<Long, Integer, Integer>, Tuple> keyedStream = filterStream
+        KeyedStream<Tuple3<Long, Integer, Integer>, Tuple> keyedStream = filteredStream
                 .assignTimestampsAndWatermarks(new AscendingTimestampExtractor<Tuple3<Long, Integer, Integer>>() {
 
                     @Override
@@ -69,6 +70,7 @@ public class exercise1 {
                 })
                 .keyBy(1); // Key by Xway
 
+        // Compute output
         SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Integer>> sumTumblingEventTimeWindow = keyedStream
                 .window(TumblingEventTimeWindows.of(Time.hours(1)))
                 .apply(new CountVehicles());

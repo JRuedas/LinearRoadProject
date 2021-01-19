@@ -55,6 +55,7 @@ public class exercise3 {
                     }
                 });
 
+        // Filter by segment
         SingleOutputStreamOperator<Tuple5<Long, Integer, Integer, Integer, Integer>> filteredStream = mappedStream
                 .filter(new FilterFunction<Tuple5<Long, Integer, Integer, Integer, Integer>>() {
 
@@ -63,7 +64,7 @@ public class exercise3 {
                     }
                 });
 
-        KeyedStream<Tuple5<Long, Integer, Integer, Integer, Integer>, Tuple> keyedByVIDStream = filteredStream
+        KeyedStream<Tuple5<Long, Integer, Integer, Integer, Integer>, Tuple> keyedByXwayVIDStream = filteredStream
                 .assignTimestampsAndWatermarks(new AscendingTimestampExtractor<Tuple5<Long, Integer, Integer, Integer, Integer>>() {
 
                     @Override
@@ -71,14 +72,14 @@ public class exercise3 {
                         return element.f0*1000;
                     }
                 })
-                .keyBy(1); // Key by VID
+                .keyBy(3, 1); // Key by Xway and VID
 
-        // Compute Avg speed per car
-        SingleOutputStreamOperator<Tuple3<Integer, Integer, Integer>> carAvgSpeedTumblingEventTimeWindow = keyedByVIDStream
+        // Compute Avg speed per car output 1
+        SingleOutputStreamOperator<Tuple3<Integer, Integer, Integer>> carAvgSpeedTumblingEventTimeWindow = keyedByXwayVIDStream
                 .window(TumblingEventTimeWindows.of(Time.hours(1)))
                 .apply(new ComputeAverageSpeed());
 
-        // emit result
+        // emit result 1
         if (params.has("output1")) {
             String file = params.get("output1");
             carAvgSpeedTumblingEventTimeWindow.writeAsCsv(file, FileSystem.WriteMode.OVERWRITE);
@@ -87,12 +88,12 @@ public class exercise3 {
         KeyedStream<Tuple3<Integer, Integer, Integer>, Tuple> keyedByXwayStream = carAvgSpeedTumblingEventTimeWindow
                 .keyBy(1);  // Key by Xway
 
-        // Compute output
+        // Compute output 2
         SingleOutputStreamOperator<Tuple3<Integer, Integer, Integer>> outputTumblingEventTimeWindow = keyedByXwayStream
                 .window(TumblingEventTimeWindows.of(Time.hours(1)))
                 .apply(new ComputeMaxAverageSpeed());
 
-        // emit result
+        // emit result 2
         if (params.has("output2")) {
             String file = params.get("output2");
             outputTumblingEventTimeWindow.writeAsCsv(file, FileSystem.WriteMode.OVERWRITE);

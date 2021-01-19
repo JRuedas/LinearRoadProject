@@ -59,6 +59,7 @@ public class exercise2 {
                     }
                 });
 
+        // Filter by Direction 4 = Eastbound and Segment
         SingleOutputStreamOperator<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>> filteredStream = mappedStream
                 .filter(new FilterFunction<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>>() {
 
@@ -67,7 +68,7 @@ public class exercise2 {
                     }
                 });
 
-        KeyedStream<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>, Tuple> keyedByVIDStream = filteredStream
+        KeyedStream<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>, Tuple> keyedByXwayVIDStream = filteredStream
                 .assignTimestampsAndWatermarks(new AscendingTimestampExtractor<Tuple6<Long, Integer, Integer, Integer, Integer, Integer>>() {
 
                     @Override
@@ -75,14 +76,14 @@ public class exercise2 {
                         return element.f0*1000;
                     }
                 })
-                .keyBy(1); // Key by VID
+                .keyBy(3, 1); // Key by Xway and VID
 
         // Compute Avg speed per car
-        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Integer>> carAvgSpeedTumblingEventTimeWindow = keyedByVIDStream
+        SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Integer>> carAvgSpeedTumblingEventTimeWindow = keyedByXwayVIDStream
                 .window(TumblingEventTimeWindows.of(Time.seconds(time)))
                 .apply(new ComputeAverageSpeed());
 
-        // Filter cars by Avg speed
+        // Filter cars by Avg speed > speed
         SingleOutputStreamOperator<Tuple4<Long, Integer, Integer, Integer>> filteredSpeedStream = carAvgSpeedTumblingEventTimeWindow
                 .filter(new FilterFunction<Tuple4<Long, Integer, Integer, Integer>>() {
 
